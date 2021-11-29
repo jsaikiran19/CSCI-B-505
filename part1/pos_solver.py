@@ -9,8 +9,8 @@
 
 import random
 import math
-
-
+import copy
+import functools
 # We've set up a suggested code structure, but feel free to change it. Just
 # make sure your code still works with the label.py and pos_scorer.py code
 # that we've supplied.
@@ -18,6 +18,12 @@ import math
 class Solver:
     # Calculate the log of the posterior probability of a given sentence
     #  with a given part-of-speech labeling. Right now just returns -999 -- fix this!
+    parts_of_speech_tags = set(['adj','adv','adp','conj','det','noun','num','pron','prt','verb','x','.'])
+    words_dict = {}
+    tags_count = {}
+    transition_probs = {}
+    transition_dict = {}
+    emission_probs = {}
     def posterior(self, model, sentence, label):
         if model == "Simple":
             return -999
@@ -31,15 +37,108 @@ class Solver:
     # Do the training!
     #
     def train(self, data):
-        pass
+        for words, labels in data:
+            for i in range(len(words)):
+                if i==0:
+                    self.transition_probs['P0'+labels[i]] = self.transition_probs.get('P0'+labels[i],0)+1
+
+                if i<len(words)-1:
+                    transition = (labels[i],labels[i+1])
+                    if labels[i] not in self.transition_dict:
+                        self.transition_dict[labels[i]] = {transition:1}
+                    else:
+                        self.transition_dict[labels[i]][transition] = self.transition_dict[labels[i]].get(transition,0)+1
+
+                self.tags_count[labels[i]] = self.tags_count.get(labels[i],0)+1
+
+
+                if words[i] not in self.words_dict:
+                    self.words_dict[words[i]] = {labels[i]:1}
+                else:
+                    self.words_dict[words[i]][labels[i]] = self.words_dict[words[i]].get(labels[i],0) + 1
+        for tag in self.transition_dict: 
+            for transition in self.transition_dict[tag]:
+                self.transition_probs[transition] = self.transition_dict[tag][transition] / sum(self.transition_dict[tag].values())
+            self.transition_probs['P0'+tag] = self.transition_probs.get('P0'+tag,0)/len(data)
 
     # Functions for each algorithm. Right now this just returns nouns -- fix this!
     #
     def simplified(self, sentence):
-        return [ "noun" ] * len(sentence)
+        res = []
+        most_frequent_tag = max(self.tags_count.items(),key=lambda x:x[1])[0]
+        for word in sentence:
+            if word not in self.words_dict:
+                res.append(most_frequent_tag)
+            else:
+                probs = []
+                for tag in self.parts_of_speech_tags:
+                    probs.append((self.words_dict[word].get(tag,0)/sum(self.words_dict[word].values()), tag))
+
+                res.append(max(probs,key=lambda x:x[0])[1])
+        return res
 
     def hmm_viterbi(self, sentence):
-        return [ "noun" ] * len(sentence)
+        res = []
+        most_frequent_tag = max(self.tags_count.items(),key=lambda x:x[1])[0]
+        possible_hmms = list(self.words_dict.get(sentence[0],{most_frequent_tag:1}).keys())
+        initial_tag_keys = list(map(lambda x: (x,self.transition_probs['P0'+x]),self.parts_of_speech_tags))
+        highesht_probable_initial_tag = max(initial_tag_keys,key=lambda x:x[1])[0]
+        
+        
+        for i, hmm in enumerate(possible_hmms):
+            
+            P0 = math.log(self.transition_probs['P0'+hmm])
+            hmm_chains = [[(hmm,P0)]]
+            # combs = []
+            def get_maximum_hmm_path(a1,a2):
+                l1 = sum(list(map(lambda x: x[1],a1)))
+                l2 = sum(list(map(lambda x: x[1],a2)))
+                return l1-l2
+            
+            k = 0
+            for j,word in enumerate(sentence[1:]):
+                
+                parent_chain = []
+                highest_probable_tag_from_prev = ''
+            
+                
+
+                if word not in self.words_dict:
+                    
+                    if j==0:
+                        prev_word_tag = highesht_probable_initial_tag
+                    else:
+                        prev_word_tag = max(self.words_dict[sentence[j]],key=lambda x:self.words_dict[sentence[j]][x])
+
+                    highest_probable_tag_from_prev = max(self.transition_dict[prev_word_tag],key=lambda x:self.transition_dict[prev_word_tag][x])[1]
+
+                    self.words_dict[word] = {highest_probable_tag_from_prev:1}
+
+                # print(self.words_dict[word])
+                for tag in (self.words_dict[word]):
+                    sub_chain = copy.deepcopy(hmm_chains)
+                    for chain in sub_chain:
+                        log_prob = math.log(self.transition_probs.get((chain[-1][0],tag),1/len(self.transition_probs)))+math.log(self.words_dict[word][tag]/(self.tags_count[tag]))
+                        chain.append((tag,log_prob))
+                    if sentence[j] in self.words_dict and len(self.words_dict[sentence[j]])>1:
+                        sub_chain = [((max(sub_chain,key=functools.cmp_to_key(get_maximum_hmm_path))))]
+                    parent_chain+=(sub_chain)
+                
+
+                hmm_chains = parent_chain.copy()
+                
+
+                k+=1
+
+            res+=(hmm_chains)
+        
+        
+        
+        results = []
+        for hmm in res:
+            results.append((list(map(lambda x: x[0],hmm)),sum(list(map(lambda x:x[1],hmm)))))
+        return (max(results,key=lambda x:x[1])[0])
+ 
 
     def complex_mcmc(self, sentence):
         return [ "noun" ] * len(sentence)
