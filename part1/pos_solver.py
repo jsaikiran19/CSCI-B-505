@@ -138,10 +138,43 @@ class Solver:
         for hmm in res:
             results.append((list(map(lambda x: x[0],hmm)),sum(list(map(lambda x:x[1],hmm)))))
         return (max(results,key=lambda x:x[1])[0])
- 
+
+    
+    def calculate_probability(self,sentence,chain):
+        p = 0
+        for i,tag in enumerate(chain):
+            if sentence[i] not in self.words_dict:
+                p+=1e-10
+            elif i==0:
+                p+=math.log(self.transition_probs.get('P0'+tag,1e-10))+math.log(self.words_dict[sentence[i]].get(tag,1e-10)/(self.tags_count[tag]))
+            elif i==1:
+                p+=math.log(self.transition_probs.get((chain[i-1],tag),1e-10))+math.log(self.words_dict[sentence[i]].get(tag,1e-10)/(self.tags_count[tag]))
+            else:
+                p+=math.log(self.transition_probs.get((chain[i-2],chain[i-1]),1e-10))+math.log(self.transition_probs.get((chain[i-1],tag),1e-10))+math.log(self.words_dict[sentence[i]].get(tag,1e-10)/(self.tags_count[tag]))
+        return p
 
     def complex_mcmc(self, sentence):
-        return [ "noun" ] * len(sentence)
+        k = 0
+        intial_sample = ['noun']*len(sentence)
+        gibbs_samples = [(intial_sample,self.calculate_probability(sentence,intial_sample))]
+        
+        while k<50:
+            hmm = gibbs_samples[-1][0]
+            mx_prob = -10000
+            for i,word in enumerate(hmm):
+                
+                for tag in self.parts_of_speech_tags:
+                    new_hmm = copy.deepcopy(hmm)
+                    new_hmm[i] = tag
+                    sentence_prob = self.calculate_probability(sentence,new_hmm)
+                    if sentence_prob>mx_prob:
+                        mx_prob = sentence_prob
+                        hmm[i] = tag
+            gibbs_samples.append((hmm,self.calculate_probability(sentence,hmm)))
+            k+=1
+            
+
+        return max(gibbs_samples,key=lambda x:x[1])[0]
 
 
 
