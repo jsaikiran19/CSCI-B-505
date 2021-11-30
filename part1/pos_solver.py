@@ -170,7 +170,8 @@ class Solver:
                     if sentence_prob>mx_prob:
                         mx_prob = sentence_prob
                         hmm[i] = tag
-            gibbs_samples.append((hmm,self.calculate_probability(sentence,hmm)))
+            if k>30:
+                gibbs_samples.append((hmm,self.calculate_probability(sentence,hmm)))
             k+=1
             
 
