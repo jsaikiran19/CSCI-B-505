@@ -79,6 +79,15 @@ if __name__ == "__main__":
     # airice_simple = [ image_array.shape[0]*0.25 ] * image_array.shape[1]
     #=======================================================================================
     # Air Ice Simple
+    def smoothness(row,prev_row,imageArray=[[]]):
+        if abs(row-prev_row)<5:
+            return math.log(0.9)
+        elif abs(row-prev_row)<10:
+            return math.log(0.6)
+        elif abs(row-prev_row)<30:
+            return math.log(0.1)
+        else:
+            return math.log(0.001)
     airice_simple = []
     for i in range(len(image_array[0])): # column
         mx = -1000
@@ -94,61 +103,35 @@ if __name__ == "__main__":
     # print(airice_simple)
     # airice_hmm = [ image_array.shape[0]*0.5 ] * image_array.shape[1]
     airice_hmm = []
-    def emmission_prob(edge_strength, rw, cl): # gives the max if it has high edge value
-        #print(rw,cl)
-        a = math.log(1/(int(edge_strength[rw][cl])+1))
-        return a
-    
-    def trans_prob(image_array, rw, cl, dum_hmm):
-
-        prob_mat = [] # storing prob for cur row to prev col row
-        px = image_array[rw][cl - 1]  # have to change *******____*******
-        for i in range(len(image_array)):
-            if abs(rw - i) < 20:
-                if abs(px - i) == 0:
-                    d = -1 * math.log(0.9)
-                elif abs(px - i) <= 5:
-                    d = -1 * math.log(0.3)
-                else:
-                    d = -1 * math.log(0.01)
-            else:
-                d = 100
-            prob_mat.append(dum_hmm[(rw,cl-1)][0] + d)
-        return prob_mat
-            
-
-    #parents = [(edge_strength[i][0],image_array[i][0],[i],0) for i in range(len(edge_strength))] # storing the initial pixel values and pos
-    dum_hmm = {}
-    # initial state 0
-    for i in range(len(edge_strength)):
-        dum_hmm[(i,0)] = (math.log(1/(int(edge_strength[i][0])+1)),[0])
-    # calculating the viterbi
+    parents = [(edge_strength[i][0],image_array[i][0],[i],0) for i in range(len(edge_strength))] # storing the initial pixel values and pos
+    res = []
+    max_edge_strength = amax(edge_strength,axis=0)
     for i in range(1,len(edge_strength[0])): # traversing in column
-        #res = [] # to store curr vals and pos
+        res = [] # to store curr vals and pos
         for j in range(len(edge_strength)): # row
-            em_prob = emmission_prob(edge_strength, j, i)
-            tr_prob = trans_prob(image_array,j,i,dum_hmm)
-            #print(tr_prob)
-            pr_val = min(tr_prob) + em_prob # total probability
-            path = dum_hmm[(tr_prob.index(min(tr_prob)),i-1)][1] + [tr_prob.index(min(tr_prob))]  # path should be list
-            dum_hmm[(j,i)] = (pr_val, path)
-    
-    last_lst = []
-    mx = -1000
-    ps = 0
-    for i in range(len(edge_strength)):
-        a = dum_hmm[(i , len(edge_strength[0])-1)][0] # value
+            mxk = -10000
+            posk = [0]
+            maxprob = 0
+            mx_idx = 0
+            for k in parents:
+                # print(edge_strength[j][i])
+                
+                a = math.log(1/(1 + abs(j-k[2][-1]))+1e-10) + math.log(edge_strength[j][i]/max_edge_strength[i]+1e-10) +k[3]
+                
+                if a > mxk:
+                    maxprob = k [3]
+                    mxk = a
+                    posk = k[2]
+                    mx_idx = j
 
-        if a > mx:
-            mx = a
-            ps = i
+                elif a==mxk and abs(j-k[2][-1])<j-mx_idx:
+                    mx_idx = k[-2][-1]
 
-        #last_lst.append(dum_hmm[(i - len(edge_strength[0]-1))][0])
-    airice_hmm = dum_hmm[(ps , len(edge_strength[0]) - 1)][1] # getting path
-    
-       
+            
+            res.extend([(edge_strength[j][i],image_array[j][i],posk+[mx_idx],mxk)])
+        parents =  res.copy()
     # print(parents[0])
-    #airice_hmm = max(parents,key=lambda x:x[3])[2]
+    airice_hmm = max(parents,key=lambda x:x[3])[2]
     print(airice_hmm)
 
 
@@ -168,7 +151,40 @@ if __name__ == "__main__":
         icerock_simple.append(pos)
 
     
-    icerock_hmm = [ image_array.shape[0]*0.5 ] * image_array.shape[1]
+    
+    #icerock_hmm = [ image_array.shape[0]*0.5 ] * image_array.shape[1]
+    icerock_hmm = []
+    
+    parents = [(edge_strength[i][0],image_array[i][0],[i],0) for i in range(len(edge_strength))] # storing the initial pixel values and pos
+    res = []
+    # print(max_edge_strength)
+    for i in range(1,len(edge_strength[0])): # traversing in column
+        res = [] # to store curr vals and pos
+        for j in range(airice_hmm[i]+10, len(edge_strength)): # row
+            mxk = -10000
+            posk = [0]
+            maxprob = 0
+            mx_idx = 0
+            for k in parents:
+                
+                a = math.log(1/(1 + abs(j - k[2][-1]))+1e-10)+math.log(edge_strength[j][i]/max_edge_strength[i]+1e-10)+k[3]
+                
+
+                if a > mxk:
+                    maxprob = k [3]
+                    mxk = a
+                    posk = k[2]
+                    mx_idx = j
+
+                elif a==mxk and abs(j-k[2][-1])<j-mx_idx:
+                    mx_idx = k[-2][-1]
+            
+            res.extend([(edge_strength[j][i],image_array[j][i],posk+[mx_idx],mxk)])
+        parents =  res.copy()
+    # print(parents[0])
+    # print(edge_strength)
+    icerock_hmm = max(parents,key=lambda x:x[3])[2]
+    print(icerock_hmm)
     icerock_feedback= [ image_array.shape[0]*0.75 ] * image_array.shape[1]
 
     # Now write out the results as images and a text file
