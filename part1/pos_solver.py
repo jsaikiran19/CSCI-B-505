@@ -144,7 +144,7 @@ class Solver:
         p = 0
         for i,tag in enumerate(chain):
             if sentence[i] not in self.words_dict:
-                p+=1e-10
+                p+= math.log(1e-10)
             elif i==0:
                 p+=math.log(self.transition_probs.get('P0'+tag,1e-10))+math.log(self.words_dict[sentence[i]].get(tag,1e-10)/(self.tags_count[tag]))
             elif i==1:
@@ -170,11 +170,14 @@ class Solver:
                     if sentence_prob>mx_prob:
                         mx_prob = sentence_prob
                         hmm[i] = tag
-            if k>30:
-                gibbs_samples.append((hmm,self.calculate_probability(sentence,hmm)))
+            # if k>30:
+            gibbs_samples.append((hmm,self.calculate_probability(sentence,hmm)))
+            
+            #breaking if the previous three hmms resulted in same predictions
+            if k> 2 and gibbs_samples[-1][0]==gibbs_samples[-2][0]==gibbs_samples[-3][0]:
+                break
             k+=1
             
-
         return max(gibbs_samples,key=lambda x:x[1])[0]
 
 
