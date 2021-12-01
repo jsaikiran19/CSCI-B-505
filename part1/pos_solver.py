@@ -26,11 +26,11 @@ class Solver:
     emission_probs = {}
     def posterior(self, model, sentence, label):
         if model == "Simple":
-            return -999
+            return self.calculate_probability(sentence,label,model)
         elif model == "HMM":
-            return -999
+            return self.calculate_probability(sentence,label,model)
         elif model == "Complex":
-            return -999
+            return self.calculate_probability(sentence,label,model)
         else:
             print("Unknown algo!")
 
@@ -78,7 +78,37 @@ class Solver:
         return res
 
     def hmm_viterbi(self, sentence):
+
+        def grammar_rules(word):
+            if word[-2:]=='ly':
+                return 'adv'
+                        
+            elif word[-2:]=='ed':
+                return 'verb'
+
+            elif word[-2:] in ['ar','er','or']:
+                return 'noun'
+
+            elif word[-2:] in ['al','ic']:
+                return 'adj'
+
+            elif word[-3:] in ['ist','ion','ity']:
+                return 'noun'
+
+            elif word[-3:] in ['ful','ous','ish','ive','ian']:
+                return 'adj'
+            
+            elif word[-3:] in ['ate','ify','ize']:
+                return 'verb'
+            
+            elif word[-4:] in ['less']:
+                return 'adj'
+            
+            elif word[-4:] in [ 'ence','ment','ness','ship','tion','sion']:
+                return 'noun'
+
         res = []
+        final_tags = ['-']*len(sentence)
         most_frequent_tag = max(self.tags_count.items(),key=lambda x:x[1])[0]
         possible_hmms = list(self.words_dict.get(sentence[0],{most_frequent_tag:1}).keys())
         initial_tag_keys = list(map(lambda x: (x,self.transition_probs['P0'+x]),self.parts_of_speech_tags))
@@ -104,7 +134,11 @@ class Solver:
                 
 
                 if word not in self.words_dict:
-                    
+                    n = len(word)
+                    if len(word)>3:
+                        grammar_word = grammar_rules(word)
+                        if grammar_word:
+                            final_tags[j+1] = grammar_word
                     if j==0:
                         prev_word_tag = highesht_probable_initial_tag
                     else:
@@ -137,20 +171,24 @@ class Solver:
         results = []
         for hmm in res:
             results.append((list(map(lambda x: x[0],hmm)),sum(list(map(lambda x:x[1],hmm)))))
-        return (max(results,key=lambda x:x[1])[0])
+        final_hmm = (max(results,key=lambda x:x[1])[0])
+        for i in range(len(final_hmm)):
+            if final_tags[i]!='-':
+                final_hmm[i] = final_tags[i]
+        return final_hmm
 
     
-    def calculate_probability(self,sentence,chain):
+    def calculate_probability(self,sentence,chain, model='Complex'):
         p = 0
         for i,tag in enumerate(chain):
-            if sentence[i] not in self.words_dict:
-                p+= math.log(1e-10)
+            if model=='Simple':
+                p+=math.log(self.words_dict.get(sentence[i],{tag:1e-10}).get(tag,1e-10)/(self.tags_count[tag]))
             elif i==0:
-                p+=math.log(self.transition_probs.get('P0'+tag,1e-10))+math.log(self.words_dict[sentence[i]].get(tag,1e-10)/(self.tags_count[tag]))
-            elif i==1:
-                p+=math.log(self.transition_probs.get((chain[i-1],tag),1e-10))+math.log(self.words_dict[sentence[i]].get(tag,1e-10)/(self.tags_count[tag]))
-            else:
-                p+=math.log(self.transition_probs.get((chain[i-2],chain[i-1]),1e-10))+math.log(self.transition_probs.get((chain[i-1],tag),1e-10))+math.log(self.words_dict[sentence[i]].get(tag,1e-10)/(self.tags_count[tag]))
+                p+=math.log(self.transition_probs.get('P0'+tag,1e-10))+math.log(self.words_dict.get(sentence[i],{tag:1e-10}).get(tag,1e-10)/(self.tags_count[tag]))
+            elif i==1 or model=='HMM':
+                p+=math.log(self.transition_probs.get((chain[i-1],tag),1e-10))+math.log(self.words_dict.get(sentence[i],{tag:1e-10}).get(tag,1e-10)/(self.tags_count[tag]))
+            elif model=='Complex':
+                p+=math.log(self.transition_probs.get((chain[i-2],chain[i-1]),1e-10))+math.log(self.transition_probs.get((chain[i-1],tag),1e-10))+math.log(self.words_dict.get(sentence[i],{tag:1e-10}).get(tag,1e-10)/(self.tags_count[tag]))
         return p
 
     def complex_mcmc(self, sentence):
