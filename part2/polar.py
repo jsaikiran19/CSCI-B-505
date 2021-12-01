@@ -11,7 +11,7 @@ from numpy import *
 from scipy.ndimage import filters
 import sys
 import imageio
-
+import math
 # calculate "Edge strength map" of an image                                                                                                                                      
 def edge_strength(input_image):
     grayscale = array(input_image.convert('L'))
@@ -65,19 +65,126 @@ if __name__ == "__main__":
     # load in image 
     input_image = Image.open(input_filename).convert('RGB')
     image_array = array(input_image.convert('L'))
-
+    # with open('img_file.txt','w') as f:
+    #     for item in image_array:
+    #         f.write("%s \n" % item)
     # compute edge strength mask -- in case it's helpful. Feel free to use this.
     edge_strength = edge_strength(input_image)
+    # print("edge strength",edge_strength.shape)
+    # print("==")
     imageio.imwrite('edges.png', uint8(255 * edge_strength / (amax(edge_strength))))
 
     # You'll need to add code here to figure out the results! For now,
     # just create some random lines.
-    airice_simple = [ image_array.shape[0]*0.25 ] * image_array.shape[1]
-    airice_hmm = [ image_array.shape[0]*0.5 ] * image_array.shape[1]
-    airice_feedback= [ image_array.shape[0]*0.75 ] * image_array.shape[1]
+    # airice_simple = [ image_array.shape[0]*0.25 ] * image_array.shape[1]
+    #=======================================================================================
+    # Air Ice Simple
+    def smoothness(row,prev_row,imageArray=[[]]):
+        if abs(row-prev_row)<5:
+            return math.log(0.9)
+        elif abs(row-prev_row)<10:
+            return math.log(0.6)
+        elif abs(row-prev_row)<30:
+            return math.log(0.1)
+        else:
+            return math.log(0.001)
+    airice_simple = []
+    for i in range(len(image_array[0])): # column
+        mx = -1000
+        pos = 0
+        for j in range(len(image_array)): # row
+            if i != 0 and abs(airice_simple[i-1]-j) > 10:
+                continue
+            if mx < edge_strength[j][i]:
+                mx = edge_strength[j][i]
+                pos = j
+        
+        airice_simple.append(pos)
+    # print(airice_simple)
+    # airice_hmm = [ image_array.shape[0]*0.5 ] * image_array.shape[1]
+    airice_hmm = []
+    parents = [(edge_strength[i][0],image_array[i][0],[i],0) for i in range(len(edge_strength))] # storing the initial pixel values and pos
+    res = []
+    max_edge_strength = amax(edge_strength,axis=0)
+    for i in range(1,len(edge_strength[0])): # traversing in column
+        res = [] # to store curr vals and pos
+        for j in range(len(edge_strength)): # row
+            mxk = -10000
+            posk = [0]
+            maxprob = 0
+            mx_idx = 0
+            for k in parents:
+                # print(edge_strength[j][i])
+                
+                a = math.log(1/(1 + abs(j-k[2][-1]))+1e-10) + math.log(edge_strength[j][i]/max_edge_strength[i]+1e-10) +k[3]
+                
+                if a > mxk:
+                    maxprob = k [3]
+                    mxk = a
+                    posk = k[2]
+                    mx_idx = j
 
-    icerock_simple = [ image_array.shape[0]*0.25 ] * image_array.shape[1]
-    icerock_hmm = [ image_array.shape[0]*0.5 ] * image_array.shape[1]
+                elif a==mxk and abs(j-k[2][-1])<j-mx_idx:
+                    mx_idx = k[-2][-1]
+
+            
+            res.extend([(edge_strength[j][i],image_array[j][i],posk+[mx_idx],mxk)])
+        parents =  res.copy()
+    # print(parents[0])
+    airice_hmm = max(parents,key=lambda x:x[3])[2]
+    print(airice_hmm)
+
+
+    
+    airice_feedback= [ image_array.shape[0]*0.75 ] * image_array.shape[1]
+    # ==============================================================================
+    # Ice rock Simple
+    icerock_simple = []
+    for i in range(len(image_array[0])): # column
+        mx = -1000
+        pos = 0
+        for j in range(len(image_array)): # row
+            if mx < edge_strength[j][i] and abs(j-airice_simple[i])>10:
+                mx = edge_strength[j][i]
+                pos = j
+        
+        icerock_simple.append(pos)
+
+    
+    
+    #icerock_hmm = [ image_array.shape[0]*0.5 ] * image_array.shape[1]
+    icerock_hmm = []
+    
+    parents = [(edge_strength[i][0],image_array[i][0],[i],0) for i in range(len(edge_strength))] # storing the initial pixel values and pos
+    res = []
+    # print(max_edge_strength)
+    for i in range(1,len(edge_strength[0])): # traversing in column
+        res = [] # to store curr vals and pos
+        for j in range(airice_hmm[i]+10, len(edge_strength)): # row
+            mxk = -10000
+            posk = [0]
+            maxprob = 0
+            mx_idx = 0
+            for k in parents:
+                
+                a = math.log(1/(1 + abs(j - k[2][-1]))+1e-10)+math.log(edge_strength[j][i]/max_edge_strength[i]+1e-10)+k[3]
+                
+
+                if a > mxk:
+                    maxprob = k [3]
+                    mxk = a
+                    posk = k[2]
+                    mx_idx = j
+
+                elif a==mxk and abs(j-k[2][-1])<j-mx_idx:
+                    mx_idx = k[-2][-1]
+            
+            res.extend([(edge_strength[j][i],image_array[j][i],posk+[mx_idx],mxk)])
+        parents =  res.copy()
+    # print(parents[0])
+    # print(edge_strength)
+    icerock_hmm = max(parents,key=lambda x:x[3])[2]
+    print(icerock_hmm)
     icerock_feedback= [ image_array.shape[0]*0.75 ] * image_array.shape[1]
 
     # Now write out the results as images and a text file
