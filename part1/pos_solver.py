@@ -1,7 +1,7 @@
 ###################################
 # CS B551 Spring 2021, Assignment #3
 #
-# Your names and user ids:
+# Submitted By: Sai Kiran Jella (sjella)
 #
 # (Based on skeleton code by D. Crandall)
 #
