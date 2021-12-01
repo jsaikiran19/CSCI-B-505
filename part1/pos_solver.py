@@ -146,7 +146,7 @@ class Solver:
 
                     highest_probable_tag_from_prev = max(self.transition_dict[prev_word_tag],key=lambda x:self.transition_dict[prev_word_tag][x])[1]
 
-                    self.words_dict[word] = {highest_probable_tag_from_prev:1}
+                    self.words_dict[word] = {most_frequent_tag:1}
 
                 # print(self.words_dict[word])
                 for tag in (self.words_dict[word]):
