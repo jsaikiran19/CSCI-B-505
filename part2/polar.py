@@ -109,15 +109,6 @@ if __name__ == "__main__":
         icerock_simple.append(pos)
     # ==============================================================================   
     # Air Ice Viterbi
-    def smoothness(row,prev_row,imageArray=[[]]):
-        if abs(row-prev_row)<5:
-            return math.log(0.9)
-        elif abs(row-prev_row)<10:
-            return math.log(0.6)
-        elif abs(row-prev_row)<30:
-            return math.log(0.1)
-        else:
-            return math.log(0.001)
     airice_hmm = []
     parents = [([i],0) for i in range(len(edge_strength))] # storing the initial pixel values and pos
     max_edge_strength = amax(edge_strength,axis=0) # Maximum Edge Strength of each column from the Image
@@ -186,7 +177,6 @@ if __name__ == "__main__":
     # Air Ice Human FeedBack
     airice_feedback = []
     parents = [([i],0) for i in range(len(edge_strength))] # storing the initial pixel values and pos
-    max_edge_strength = amax(edge_strength,axis=0) # Maximum Edge Strength of each column from the Image
     for i in range(1,len(edge_strength[0])): # traversing in Column
         res = [] # to store curr vals and pos
         
@@ -239,7 +229,6 @@ if __name__ == "__main__":
     # Ice Rock Human FeedBack
     icerock_feedback = []
     parents = [([i],0) for i in range(len(edge_strength))] # storing the initial pixel values and pos
-    max_edge_strength = amax(edge_strength,axis=0) # Maximum Edge Strength of each column from the Image
     
     for i in range(1,len(edge_strength[0])): # traversing in column
         res = [] # to store curr vals and pos
