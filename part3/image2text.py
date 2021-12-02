@@ -17,7 +17,7 @@ import math
 CHARACTER_WIDTH=14
 CHARACTER_HEIGHT=25
 TRAIN_LETTERS="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789(),.-!?\"' "
-total_train_letters = len(TRAIN_LETTERS)
+len_states = len(TRAIN_LETTERS)
 
 
 def load_letters(fname):
@@ -33,7 +33,7 @@ def load_letters(fname):
 
 def load_training_letters(fname):
     letter_images = load_letters(fname)
-    return { TRAIN_LETTERS[i]: letter_images[i] for i in range(0, total_train_letters ) }
+    return { TRAIN_LETTERS[i]: letter_images[i] for i in range(0, len_states ) }
 
 #####
 # main program
@@ -66,7 +66,7 @@ def calculate_init_trans(words_file_name):
     training_words = open(words_file_name, 'r')
 
     init_prob = Counter()
-    trans_prob = np.zeros(shape=(total_train_letters, total_train_letters))
+    trans_prob = np.zeros(shape=(len_states, len_states))
     words = []
     letters = ''
 
@@ -82,9 +82,9 @@ def calculate_init_trans(words_file_name):
     
     total_words = len(words)
     for key in init_prob:
-        init_prob[key] = math.log(init_prob[key] / total_words)
+        init_prob[key] = math.log(init_prob[key]+1 / total_words+2)
 
-    for i in range(len(letters)):
+    for i in range(len(letters)-1):
         if letters[i] in TRAIN_LETTERS and letters[i+1] in TRAIN_LETTERS:
             trans_prob[TRAIN_LETTERS.index(letters[i]), TRAIN_LETTERS.index(letters[i+1])] += 1
 
@@ -97,7 +97,8 @@ def calculate_init_trans(words_file_name):
 
 
 def calculate_emission():
-    emission_prob = np.zeros(shape=(total_train_letters, total_train_letters))
+    m = 0.35
+    emission_prob = np.zeros(shape=(len_states, len_states))
     for key, value in train_letters.items():
         for j in range(len(test_letters)):
             hit = 0
@@ -109,21 +110,23 @@ def calculate_emission():
                         hit += 1
                     else:
                         miss += 1
+
             hit_prob = hit / (hit + miss)
             miss_prob = 1 - hit_prob
 
+            prob = (hit_prob ** hit) * (miss_prob ** miss)
+
             i = TRAIN_LETTERS.index(key)
-            emission_prob[i][j] = math.log((hit_prob ** hit) * (miss_prob ** miss))
+            emission_prob[i][j] = math.log(10**(-6)) if prob == 0 else math.log(prob)
 
     return emission_prob
                 
 def simple(letters, emission):
-    rows = total_train_letters
-    cols = len(letters)
-    emission_mtx = np.zeros(shape=(rows, cols))
+    N = len(letters)
+    emission_mtx = np.zeros(shape=(len_states, N))
     
-    for i in range(0, cols):
-        for j in range(0, rows):
+    for i in range(0, N):
+        for j in range(0, len_states):
             emission_mtx[j,i] = emission[j,i]
     indices = np.argmax(emission_mtx, axis=0)
     output_str = ''
@@ -132,32 +135,32 @@ def simple(letters, emission):
     return output_str
 
 def hmm(letters, init_p, trans_p, emission_p):
-    rows = total_train_letters
-    cols = len(letters)
+    N = len(letters)
 
-    vit = np.zeros(shape=(rows, cols))
-    path = np.empty(shape=(rows, cols), dtype=int)
+    v_table = np.zeros(shape=(len_states, N))
+    which_table = np.empty(shape=(len_states, N), dtype=int)
 
-    for i in range(rows):
-        vit[i, 0] = init_p[i] + emission_p[i,0]
+    for i in range(len_states):
+        v_table[i,0] = init_p[i] + emission_p[i,0]
     
-    for j in range(1, cols):
-        for i in range(rows):
+    for i in range(1, N):
+        for s in range(len_states):
             max_val = -math.inf
             max_index = -1
-            for k in range(rows):
-                val = vit[k,j-1] + trans_p[k,i] + emission_p[i,j]
+            for s0 in range(len_states):
+                val = v_table[s0,i-1] + trans_p[s0,s]
                 if val > max_val:
                     max_val = val
-                    max_index = k
-            vit[i,j] = max_val
-            path[i,j] = max_index
+                    max_index = s0
+            max_val += emission_p[s,i]
+            v_table[s,i] = max_val
+            which_table[s,i] = max_index
 
-    most_likely = np.zeros(cols, dtype=int)
-    most_likely[-1] = np.argmax(vit[:,-1])
+    most_likely = np.zeros(N, dtype=int)
+    most_likely[-1] = np.argmax(v_table[:,-1])
 
-    for i in range(1, cols)[::-1]:
-        most_likely[i-1] = path[most_likely[i], i]
+    for i in range(1, N)[::-1]:
+        most_likely[i-1] = which_table[most_likely[i], i]
 
     output_str = ''
     for i in most_likely:
