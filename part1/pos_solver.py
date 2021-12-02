@@ -196,7 +196,7 @@ class Solver:
         intial_sample = ['noun']*len(sentence)
         gibbs_samples = [(intial_sample,self.calculate_probability(sentence,intial_sample))]
         
-        while k<50:
+        while k<100:
             hmm = gibbs_samples[-1][0]
             mx_prob = -10000
             for i,word in enumerate(hmm):
