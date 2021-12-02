@@ -107,6 +107,7 @@ class Solver:
             elif word[-4:] in [ 'ence','ment','ness','ship','tion','sion']:
                 return 'noun'
 
+            return max(self.tags_count.items(),key=lambda x:x[1])[0]
         res = []
         final_tags = ['-']*len(sentence)
         most_frequent_tag = max(self.tags_count.items(),key=lambda x:x[1])[0]
@@ -136,9 +137,7 @@ class Solver:
                 if word not in self.words_dict:
                     n = len(word)
                     if len(word)>3:
-                        grammar_word = grammar_rules(word)
-                        if grammar_word:
-                            final_tags[j+1] = grammar_word
+                        final_tags[j+1] = grammar_rules(word)
                     if j==0:
                         prev_word_tag = highesht_probable_initial_tag
                     else:
